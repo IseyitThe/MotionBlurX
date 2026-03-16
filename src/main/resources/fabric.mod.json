@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "motionblur",
+  "version": "${version}",
+  "name": "MotionBlur",
+  "description": "A Motion Blur Mod for Fabric",
+  "authors": [
+    "Seyit",
+    "Noryea"
+  ],
+  "contact": {
+    "sources": "https://github.com/IseyitThe/motionblur"
+  },
+  "license": "GPL-3.0",
+  "icon": "assets/motionblur/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "seyit.motionblur.MotionBlurMod"
+    ]
+  },
+  "mixins": [
+    "motionblur.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
