@@ -1,13 +1,13 @@
 package seyit.motionblur;
 
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.SynchronousResourceReloader;
-import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.ResourceManager;
 
-public final class MotionBlurResourceReloader implements IdentifiableResourceReloadListener, SynchronousResourceReloader {
+public final class MotionBlurResourceReloader implements IdentifiableResourceReloadListener, SimpleSynchronousResourceReloadListener {
 
-    private static final Identifier ID = Identifier.of(MotionBlurMod.ID, "reload");
+    private static final Identifier ID = Identifier.fromNamespaceAndPath(MotionBlurMod.ID, "reload");
 
     @Override
     public Identifier getFabricId() {
@@ -15,7 +15,7 @@ public final class MotionBlurResourceReloader implements IdentifiableResourceRel
     }
 
     @Override
-    public void reload(ResourceManager manager) {
+    public void onResourceManagerReload(ResourceManager manager) {
         MotionBlurRenderer.invalidate();
     }
 }
