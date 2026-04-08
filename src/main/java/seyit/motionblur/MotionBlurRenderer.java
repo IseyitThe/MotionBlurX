@@ -23,6 +23,7 @@ public final class MotionBlurRenderer {
 
     private static PostEffectProcessor processor;
     private static SimpleFramebuffer previousFramebuffer;
+    private static SimpleFramebuffer depthFramebuffer;
     private static boolean historyPrimed;
     private static boolean loadFailureLogged;
     private static int lastWidth = -1;
@@ -56,20 +57,25 @@ public final class MotionBlurRenderer {
             clearTemporalState();
         }
 
-        ensurePreviousFramebuffer(framebuffer);
+        ensureAuxiliaryFramebuffers(framebuffer);
+
+        if (framebuffer.useDepthAttachment && depthFramebuffer != null) {
+            depthFramebuffer.copyDepthFrom(framebuffer);
+        }
 
         float blendFactor = historyPrimed ? Math.min(amount, 99) / 100.0F : 0.0F;
 
         Pool pool = ((GameRendererAccessor) client.gameRenderer).getPool();
         FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
         PostEffectProcessor.FramebufferSet framebufferSet = createFramebufferSet(frameGraphBuilder, framebuffer);
-        int[] passIndex = {0};
-        effect.render(frameGraphBuilder, framebuffer.textureWidth, framebuffer.textureHeight, framebufferSet, renderPass -> {
-            if (passIndex[0]++ == 0) {
-                renderPass.setUniform(BLEND_FACTOR_UNIFORM, blendFactor);
-            }
-        });
+        effect.setUniforms(BLEND_FACTOR_UNIFORM, blendFactor);
+        effect.render(frameGraphBuilder, framebuffer.textureWidth, framebuffer.textureHeight, framebufferSet);
         frameGraphBuilder.run(pool);
+
+        if (framebuffer.useDepthAttachment && depthFramebuffer != null) {
+            framebuffer.copyDepthFrom(depthFramebuffer);
+        }
+
         historyPrimed = true;
     }
 
@@ -83,6 +89,7 @@ public final class MotionBlurRenderer {
         processor = null;
         loadFailureLogged = false;
         deletePreviousFramebuffer();
+        deleteDepthFramebuffer();
         resetHistory();
     }
 
@@ -111,15 +118,20 @@ public final class MotionBlurRenderer {
         }
     }
 
-    private static void ensurePreviousFramebuffer(Framebuffer framebuffer) {
+    private static void ensureAuxiliaryFramebuffers(Framebuffer framebuffer) {
         if (previousFramebuffer != null
                 && previousFramebuffer.textureWidth == framebuffer.textureWidth
-                && previousFramebuffer.textureHeight == framebuffer.textureHeight) {
+                && previousFramebuffer.textureHeight == framebuffer.textureHeight
+                && depthFramebuffer != null
+                && depthFramebuffer.textureWidth == framebuffer.textureWidth
+                && depthFramebuffer.textureHeight == framebuffer.textureHeight) {
             return;
         }
 
         deletePreviousFramebuffer();
-        previousFramebuffer = new SimpleFramebuffer("motionblur previous", framebuffer.textureWidth, framebuffer.textureHeight, false);
+        deleteDepthFramebuffer();
+        previousFramebuffer = new SimpleFramebuffer(framebuffer.textureWidth, framebuffer.textureHeight, false);
+        depthFramebuffer = new SimpleFramebuffer(framebuffer.textureWidth, framebuffer.textureHeight, true);
         clearTemporalState();
     }
 
@@ -144,6 +156,13 @@ public final class MotionBlurRenderer {
         if (previousFramebuffer != null) {
             previousFramebuffer.delete();
             previousFramebuffer = null;
+        }
+    }
+
+    private static void deleteDepthFramebuffer() {
+        if (depthFramebuffer != null) {
+            depthFramebuffer.delete();
+            depthFramebuffer = null;
         }
     }
 

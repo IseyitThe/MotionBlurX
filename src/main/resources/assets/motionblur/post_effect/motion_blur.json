@@ -4,8 +4,7 @@
   },
   "passes": [
     {
-      "vertex_shader": "minecraft:post/screenquad",
-      "fragment_shader": "motionblur:post/motion_blur",
+      "program": "motionblur:post/motion_blur",
       "inputs": [
         {
           "sampler_name": "In",
@@ -18,17 +17,10 @@
           "bilinear": true
         }
       ],
-      "output": "motionblur:swap",
-      "uniforms": [
-        {
-          "name": "BlendFactor",
-          "type": "float"
-        }
-      ]
+      "output": "motionblur:swap"
     },
     {
-      "vertex_shader": "minecraft:post/screenquad",
-      "fragment_shader": "minecraft:post/blit",
+      "program": "minecraft:post/blit",
       "inputs": [
         {
           "sampler_name": "In",
@@ -50,8 +42,7 @@
       "output": "motionblur:previous"
     },
     {
-      "vertex_shader": "minecraft:post/screenquad",
-      "fragment_shader": "minecraft:post/blit",
+      "program": "minecraft:post/blit",
       "inputs": [
         {
           "sampler_name": "In",
