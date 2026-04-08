@@ -3,7 +3,7 @@
   "id": "motionblurx",
   "version": "${version}",
   "name": "MotionBlurX",
-  "description": "A Motion Blur Mod for Fabric 1.21.11",
+  "description": "A Motion Blur Mod",
   "authors": [
     "Seyit",
     "Noryea"
@@ -23,8 +23,8 @@
     "motionblur.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=${loader_version}",
+    "fabricloader": "*",
     "fabric-api": "*",
-    "minecraft": "${minecraft_version}"
+    "minecraft": ">=1.21.9"
   }
 }

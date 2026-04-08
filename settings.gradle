@@ -1,9 +1,15 @@
 pluginManagement {
+    def loomVersion = providers.gradleProperty("loom_version").get()
+
     repositories {
         maven {
             name = 'Fabric'
             url = 'https://maven.fabricmc.net/'
         }
         gradlePluginPortal()
+    }
+
+    plugins {
+        id 'fabric-loom' version loomVersion
     }
 }
