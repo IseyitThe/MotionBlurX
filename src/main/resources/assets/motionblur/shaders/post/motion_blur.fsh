@@ -1,11 +1,8 @@
-#version 330
+#version 150
 
 uniform sampler2D InSampler;
 uniform sampler2D PrevSampler;
-
-layout(std140) uniform MotionBlurConfig {
-    float BlendFactor;
-};
+uniform float BlendFactor;
 
 in vec2 texCoord;
 

@@ -1,31 +1,28 @@
 package seyit.motionblur;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gl.PostEffectPass;
 import net.minecraft.client.gl.PostEffectProcessor;
-import net.minecraft.client.render.DefaultFramebufferSet;
+import net.minecraft.client.gl.SimpleFramebuffer;
+import net.minecraft.client.render.FrameGraphBuilder;
+import net.minecraft.client.util.Handle;
 import net.minecraft.client.util.Pool;
 import net.minecraft.util.Identifier;
 import seyit.motionblur.config.MotionBlurConfig;
 import seyit.motionblur.mixin.GameRendererAccessor;
-import seyit.motionblur.mixin.PostEffectPassAccessor;
-import seyit.motionblur.mixin.PostEffectProcessorAccessor;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 public final class MotionBlurRenderer {
 
     private static final Identifier EFFECT_ID = Identifier.of(MotionBlurMod.ID, "motion_blur");
-    private static final String UNIFORM_GROUP = "MotionBlurConfig";
+    private static final Identifier PREVIOUS_TARGET_ID = Identifier.of(MotionBlurMod.ID, "previous");
+    private static final String BLEND_FACTOR_UNIFORM = "BlendFactor";
 
     private static PostEffectProcessor processor;
-    private static GpuBuffer blendBuffer;
+    private static SimpleFramebuffer previousFramebuffer;
     private static boolean historyPrimed;
     private static boolean loadFailureLogged;
     private static int lastWidth = -1;
@@ -48,7 +45,7 @@ public final class MotionBlurRenderer {
         }
 
         PostEffectProcessor effect = getProcessor(client);
-        if (effect == null || blendBuffer == null) {
+        if (effect == null) {
             return;
         }
 
@@ -59,11 +56,20 @@ public final class MotionBlurRenderer {
             clearTemporalState();
         }
 
+        ensurePreviousFramebuffer(framebuffer);
+
         float blendFactor = historyPrimed ? Math.min(amount, 99) / 100.0F : 0.0F;
-        writeBlendFactor(blendFactor);
 
         Pool pool = ((GameRendererAccessor) client.gameRenderer).getPool();
-        effect.render(framebuffer, pool);
+        FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
+        PostEffectProcessor.FramebufferSet framebufferSet = createFramebufferSet(frameGraphBuilder, framebuffer);
+        int[] passIndex = {0};
+        effect.render(frameGraphBuilder, framebuffer.textureWidth, framebuffer.textureHeight, framebufferSet, renderPass -> {
+            if (passIndex[0]++ == 0) {
+                renderPass.setUniform(BLEND_FACTOR_UNIFORM, blendFactor);
+            }
+        });
+        frameGraphBuilder.run(pool);
         historyPrimed = true;
     }
 
@@ -75,24 +81,25 @@ public final class MotionBlurRenderer {
 
     public static void invalidate() {
         processor = null;
-        blendBuffer = null;
         loadFailureLogged = false;
+        deletePreviousFramebuffer();
         resetHistory();
     }
 
     private static PostEffectProcessor getProcessor(MinecraftClient client) {
-        if (blendBuffer != null && blendBuffer.isClosed()) {
-            invalidate();
-        }
-
-        if (processor != null && blendBuffer != null) {
+        if (processor != null) {
             return processor;
         }
 
         try {
-            processor = Objects.requireNonNull(client.getShaderLoader().loadPostEffect(EFFECT_ID, Set.of(DefaultFramebufferSet.MAIN)));
-            blendBuffer = RenderSystem.getDevice().createBuffer(() -> "motionblur blend", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, 4);
-            patchUniforms(processor, blendBuffer);
+            processor = client.getShaderLoader().loadPostEffect(EFFECT_ID, Set.of(PostEffectProcessor.MAIN, PREVIOUS_TARGET_ID));
+            if (processor == null) {
+                if (!loadFailureLogged) {
+                    MotionBlurMod.LOGGER.error("Failed to load motion blur post effect: shader loader returned null");
+                    loadFailureLogged = true;
+                }
+                return null;
+            }
             loadFailureLogged = false;
             return processor;
         } catch (RuntimeException e) {
@@ -104,23 +111,39 @@ public final class MotionBlurRenderer {
         }
     }
 
-    private static void patchUniforms(PostEffectProcessor effect, GpuBuffer buffer) {
-        for (PostEffectPass pass : ((PostEffectProcessorAccessor) effect).getPasses()) {
-            Map<String, GpuBuffer> uniformBuffers = ((PostEffectPassAccessor) pass).getUniformBuffers();
-            if (!uniformBuffers.containsKey(UNIFORM_GROUP)) {
-                continue;
-            }
-
-            GpuBuffer oldBuffer = uniformBuffers.put(UNIFORM_GROUP, buffer);
-            if (oldBuffer != null) {
-                oldBuffer.close();
-            }
+    private static void ensurePreviousFramebuffer(Framebuffer framebuffer) {
+        if (previousFramebuffer != null
+                && previousFramebuffer.textureWidth == framebuffer.textureWidth
+                && previousFramebuffer.textureHeight == framebuffer.textureHeight) {
+            return;
         }
+
+        deletePreviousFramebuffer();
+        previousFramebuffer = new SimpleFramebuffer("motionblur previous", framebuffer.textureWidth, framebuffer.textureHeight, false);
+        clearTemporalState();
     }
 
-    private static void writeBlendFactor(float blendFactor) {
-        try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(blendBuffer, false, true)) {
-            Std140Builder.intoBuffer(mappedView.data()).putFloat(blendFactor);
+    private static PostEffectProcessor.FramebufferSet createFramebufferSet(FrameGraphBuilder frameGraphBuilder, Framebuffer framebuffer) {
+        Map<Identifier, Handle<Framebuffer>> handles = new HashMap<>();
+        handles.put(PostEffectProcessor.MAIN, frameGraphBuilder.createObjectNode("main", framebuffer));
+        handles.put(PREVIOUS_TARGET_ID, frameGraphBuilder.createObjectNode("motionblur_previous", previousFramebuffer));
+        return new PostEffectProcessor.FramebufferSet() {
+            @Override
+            public void set(Identifier id, Handle<Framebuffer> handle) {
+                handles.put(id, handle);
+            }
+
+            @Override
+            public Handle<Framebuffer> get(Identifier id) {
+                return handles.get(id);
+            }
+        };
+    }
+
+    private static void deletePreviousFramebuffer() {
+        if (previousFramebuffer != null) {
+            previousFramebuffer.delete();
+            previousFramebuffer = null;
         }
     }
 

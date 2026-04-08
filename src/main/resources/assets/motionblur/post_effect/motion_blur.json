@@ -1,10 +1,6 @@
 {
   "targets": {
-    "swap": {},
-    "previous": {
-      "persistent": true,
-      "clear_color": 0
-    }
+    "motionblur:swap": {}
   },
   "passes": [
     {
@@ -18,20 +14,17 @@
         },
         {
           "sampler_name": "Prev",
-          "target": "previous",
+          "target": "motionblur:previous",
           "bilinear": true
         }
       ],
-      "output": "swap",
-      "uniforms": {
-        "MotionBlurConfig": [
-          {
-            "name": "BlendFactor",
-            "type": "float",
-            "value": 0.0
-          }
-        ]
-      }
+      "output": "motionblur:swap",
+      "uniforms": [
+        {
+          "name": "BlendFactor",
+          "type": "float"
+        }
+      ]
     },
     {
       "vertex_shader": "minecraft:post/screenquad",
@@ -39,24 +32,22 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "swap"
+          "target": "motionblur:swap"
         }
       ],
-      "uniforms": {
-        "BlitConfig": [
-          {
-            "name": "ColorModulate",
-            "type": "vec4",
-            "value": [
-              1.0,
-              1.0,
-              1.0,
-              1.0
-            ]
-          }
-        ]
-      },
-      "output": "previous"
+      "uniforms": [
+        {
+          "name": "ColorModulate",
+          "type": "vec4",
+          "values": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ],
+      "output": "motionblur:previous"
     },
     {
       "vertex_shader": "minecraft:post/screenquad",
@@ -64,23 +55,21 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "swap"
+          "target": "motionblur:swap"
         }
       ],
-      "uniforms": {
-        "BlitConfig": [
-          {
-            "name": "ColorModulate",
-            "type": "vec4",
-            "value": [
-              1.0,
-              1.0,
-              1.0,
-              1.0
-            ]
-          }
-        ]
-      },
+      "uniforms": [
+        {
+          "name": "ColorModulate",
+          "type": "vec4",
+          "values": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ],
       "output": "minecraft:main"
     }
   ]
