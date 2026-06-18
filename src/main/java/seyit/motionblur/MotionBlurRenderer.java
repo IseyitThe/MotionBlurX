@@ -1,6 +1,7 @@
 package seyit.motionblur;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
@@ -52,7 +53,7 @@ public final class MotionBlurRenderer {
             return;
         }
 
-        RenderTarget framebuffer = client.getMainRenderTarget();
+        RenderTarget framebuffer = client.gameRenderer.mainRenderTarget();
         if (framebuffer.width != lastWidth || framebuffer.height != lastHeight) {
             lastWidth = framebuffer.width;
             lastHeight = framebuffer.height;
@@ -119,7 +120,7 @@ public final class MotionBlurRenderer {
     }
 
     private static void writeBlendFactor(float blendFactor) {
-        try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(blendBuffer, false, true)) {
+        try (GpuBufferSlice.MappedView mappedView = blendBuffer.map(false, true)) {
             Std140Builder.intoBuffer(mappedView.data()).putFloat(blendFactor);
         }
     }
